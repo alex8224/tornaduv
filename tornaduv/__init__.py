@@ -53,6 +53,20 @@ class UVLoop(IOLoop):
         self._waker = Waker(self._loop)
         self._fdwaker = FDWaker()
         self._signal_checker = pyuv.util.SignalChecker(self._loop, self._fdwaker.reader.fileno())
+        self.setup_signal_handler()
+
+    def setup_signal_handler(self):
+        self._signal_int = pyuv.Signal(self._loop)
+        self._signal_term = pyuv.Signal(self._loop)
+        self._signal_int.start(self.catch_signal, signal.SIGINT)
+        self._signal_term.start(self.catch_signal, signal.SIGTERM)
+
+    def teardown_signal_handler(self):
+        self._signal_int.stop()
+        self._signal_term.stop()
+
+    def catch_signal(self, signal_handler, signum):
+        self.stop()
 
     def close(self, all_fds=False):
         with self._callback_lock:
@@ -171,6 +185,7 @@ class UVLoop(IOLoop):
 
     def stop(self):
         self._stopped = True
+        self.teardown_signal_handler()
         self._loop.stop()
         self._waker.wake()
 
